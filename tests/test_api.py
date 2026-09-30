@@ -1,15 +1,14 @@
 import csv
 import io
 import json
-from fastapi.testclient import TestClient
+import httpx
 import pytest
 from graphlab.api import app, save_run
 from graphlab.engine import generate
 
 @pytest.fixture
-def client(tmp_path,monkeypatch):
-    monkeypatch.setenv('GRAPHLAB_DATA_DIR',str(tmp_path))
-    with TestClient(app,base_url='http://127.0.0.1:8000') as client:
+def client(api_server):
+    with httpx.Client(base_url=api_server, trust_env=False, timeout=10) as client:
         yield client
 
 
@@ -40,7 +39,7 @@ def test_validation_errors_and_origin_boundary(client):
     assert client.post('/api/analyze',content=json.dumps({'graph':graph,'parameters':{'balance_lambda':float('inf')}}),headers={'Content-Type':'application/json'}).status_code==422
     assert client.post('/api/path',json={'graph':graph,'source':'missing','target':'0'}).status_code==400
     assert client.post('/api/analyze',json={'graph':graph},headers={'Origin':'https://evil.example'}).status_code==403
-    assert client.post('/api/analyze',json={'graph':graph},headers={'Origin':'http://localhost:8000'}).status_code==200
+    assert client.post('/api/analyze',json={'graph':graph},headers={'Origin':str(client.base_url).rstrip('/')}).status_code==200
     assert client.post('/api/import',content=b'x'*2_000_001).status_code==413
     assert client.get('/api/runs/missing').status_code==404
 
