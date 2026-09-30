@@ -13,105 +13,25 @@ def calculate_degrees():
         degrees[i] += 1
         degrees[j] += 1
     return degrees
+def _partition(method, num_partitions, lambda_balance=1.1, capacity=False):
+    from graphlab.engine import generate, edge_partition
+    from graphlab.models import Parameters
+    result = edge_partition(generate(), Parameters(partitions=num_partitions, balance_lambda=lambda_balance, capacity=capacity), method)
+    partition_edges = {p: [] for p in range(num_partitions)}
+    for (u, v, _), partition in zip(EDGES, result['assignments']):
+        partition_edges[partition].append((u, v))
+    vertex_partitions = {i: set(parts) for i, parts in enumerate(result['replicas'])}
+    print(method, 'loads:', result['loads'], 'max/ideal:', result['max_load_ratio'])
+    return partition_edges, vertex_partitions
+
 def dbh(num_partitions=2):
-    degrees = calculate_degrees()
-    
-    # Track which edges go to which partition
-    partition_edges = {p: [] for p in range(num_partitions)}
-    # Track which vertices appear on which partitions
-    vertex_partitions = {i: set() for i in range(NUM_VERTICES)}
-    
-    print(f"\nDBH (Degree-Based Hashing):")
-    print(f"   Partitions: {num_partitions}")
-    
-    for (i, j, weight) in EDGES:
-        # Hash based on LOWER degree vertex
-        if degrees[i] < degrees[j]:
-            partition = hash(i) % num_partitions
-            hash_vertex = i
-        else:
-            partition = hash(j) % num_partitions
-            hash_vertex = j
-        
-        # Assign edge to partition
-        partition_edges[partition].append((i, j))
-        
-        # Both vertices now exist on this partition
-        vertex_partitions[i].add(partition)
-        vertex_partitions[j].add(partition)
-        
-        print(f"   Edge ({i},{j}) → Partition {partition} "
-              f"[hashed on vertex {hash_vertex} "
-              f"degree={degrees[hash_vertex]}]")
-    
-    return partition_edges, vertex_partitions
-def hdrf(num_partitions=2, lambda_balance=1.1, epsilon=1.0):
-    degrees = calculate_degrees()
-    
-    # Track partition state
-    partition_edges = {p: [] for p in range(num_partitions)}
-    vertex_partitions = {i: set() for i in range(NUM_VERTICES)}
-    partition_sizes = {p: 0 for p in range(num_partitions)}
-    
-    print(f"\nHDRF (High Degree Replicated First):")
-    print(f"   Partitions: {num_partitions}")
-    print(f"   Lambda: {lambda_balance}")
-    
-    for (i, j, weight) in EDGES:
-        best_partition = 0
-        best_score = float('-inf')
-        
-        # Calculate theta (degree weights)
-        total_degree = degrees[i] + degrees[j]
-        theta_i = degrees[i] / total_degree
-        theta_j = degrees[j] / total_degree
-        
-        # Score each partition
-        maxsize = max(partition_sizes.values())
-        minsize = min(partition_sizes.values())
-        
-        for p in range(num_partitions):
-            # Replication score for vertex i
-            if p in vertex_partitions[i]:
-                g_i = 1 + (1 - theta_i)
-            else:
-                g_i = 0
-            
-            # Replication score for vertex j
-            if p in vertex_partitions[j]:
-                g_j = 1 + (1 - theta_j)
-            else:
-                g_j = 0
-            
-            # Replication term
-            c_rep = g_i + g_j
-            
-            # Balance term
-            if maxsize == minsize:
-                c_bal = 0
-            else:
-                c_bal = lambda_balance * (
-                    (maxsize - partition_sizes[p]) /
-                    (epsilon + maxsize - minsize)
-                )
-            
-            score = c_rep + c_bal
-            
-            if score > best_score:
-                best_score = score
-                best_partition = p
-        
-        # Assign edge to best partition
-        partition_edges[best_partition].append((i, j))
-        vertex_partitions[i].add(best_partition)
-        vertex_partitions[j].add(best_partition)
-        partition_sizes[best_partition] += 1
-        print(f"   Edge ({i},{j}) → Partition {best_partition} "
-              f"(score: {best_score:.4f})")
-    
-    return partition_edges, vertex_partitions
-        
-     
+    return _partition('DBH', num_partitions)
+
+def hdrf(num_partitions=2, lambda_balance=1.1, epsilon=1.0, capacity=False):
+    if epsilon != 1.0:
+        raise ValueError('The shared lab implementation fixes epsilon at 1.0.')
+    return _partition('HDRF', num_partitions, lambda_balance, capacity)
+
 def calculate_replication_factor(vertex_partitions):
     # Sum of all vertex appearances across all partitions
     total_appearances = sum(
@@ -158,7 +78,7 @@ def print_results():
     
     print(f"{'Edges in P0':<25} {dbh_p0:<15} {hdrf_p0:<15}")
     print(f"{'Edges in P1':<25} {dbh_p1:<15} {hdrf_p1:<15}")
-    print(f"{'Winner':<25} {'HDRF wins if RF lower':>15}")
+    print('Compare replication AND load balance. Lower replication alone is not a win.')
     print("=" * 60)
 
     return (dbh_partition_edges, dbh_vertex_partitions,

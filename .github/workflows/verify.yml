@@ -1,0 +1,32 @@
+name: Verify graph calculations and browser workflows
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install tested dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Test algorithms and API
+        run: python -m pytest -q -m "not browser"
+      - name: Test real browser workflows
+        run: python -m pytest -q -m browser
+      - name: Run the original coursework pipeline
+        env:
+          MPLBACKEND: Agg
+          PYTHONIOENCODING: utf-8
+        run: python main.py

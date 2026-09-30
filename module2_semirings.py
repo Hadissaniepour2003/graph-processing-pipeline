@@ -1,6 +1,6 @@
 # module2_semirings.py
 # Implements all 3 semirings and computes matrix powers
-# Standard (count paths), Any-Pair (path exists?), Min-Plus (shortest path)
+# Standard (count walks), Any-Pair (path exists?), Min-Plus (shortest path)
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -47,10 +47,13 @@ def standard_multiply(A, B):
     return C
 
 def standard_power(A, power):
-    result = A.copy()
-    for _ in range(power - 1):
+    if not isinstance(power, int) or power < 0:
+        raise ValueError('power must be a nonnegative integer')
+    result = np.eye(len(A), dtype=A.dtype)
+    for _ in range(power):
         result = standard_multiply(result, A)
     return result
+
 def anypair_multiply(A, B):
     n = len(A)
     C = np.zeros((n, n), dtype=bool)
@@ -68,12 +71,13 @@ def anypair_multiply(A, B):
     return C
 
 def anypair_power(A, power):
-    # Convert to boolean matrix
-    A_bool = A.astype(bool)
-    result = A_bool.copy()
-    for _ in range(power - 1):
-        result = anypair_multiply(result, A_bool)
+    if not isinstance(power, int) or power < 0:
+        raise ValueError('power must be a nonnegative integer')
+    result = np.eye(len(A), dtype=bool)
+    for _ in range(power):
+        result = anypair_multiply(result, A.astype(bool))
     return result
+
 def minplus_multiply(A, B):
     n = len(A)
     INF = float('inf')
@@ -91,10 +95,14 @@ def minplus_multiply(A, B):
     return C
 
 def minplus_power(A, power):
-    result = A.copy()
-    for _ in range(power - 1):
+    if not isinstance(power, int) or power < 0:
+        raise ValueError('power must be a nonnegative integer')
+    result = np.full((len(A), len(A)), float('inf'))
+    np.fill_diagonal(result, 0)
+    for _ in range(power):
         result = minplus_multiply(result, A)
     return result
+
 def print_results():
     print("=" * 60)
     print("MODULE 2 - SEMIRING MATRIX MULTIPLICATION")
@@ -102,24 +110,24 @@ def print_results():
 
     # Standard Semiring
     A_unweighted = build_unweighted_matrix()
-    print("\nSTANDARD SEMIRING (count paths):")
+    print("\nSTANDARD SEMIRING (count walks):")
     print("A^1 (direct connections):")
     print(A_unweighted)
     A2_standard = standard_power(A_unweighted, 2)
-    print("\nA^2 (paths of exactly 2 hops):")
+    print("\nA^2 (walks of exactly 2 hops):")
     print(A2_standard)
     A3_standard = standard_power(A_unweighted, 3)
-    print("\nA^3 (paths of exactly 3 hops):")
+    print("\nA^3 (walks of exactly 3 hops):")
     print(A3_standard)
 
     # Any-Pair Semiring
     print("\n" + "=" * 60)
     print("ANY-PAIR SEMIRING (path exists?):")
     A2_anypair = anypair_power(A_unweighted, 2)
-    print("\nA^2 (does 2-hop path exist?):")
+    print("\nA^2 (does an exact 2-hop walk exist?):")
     print(A2_anypair.astype(int))
     A3_anypair = anypair_power(A_unweighted, 3)
-    print("\nA^3 (does 3-hop path exist?):")
+    print("\nA^3 (does an exact 3-hop walk exist?):")
     print(A3_anypair.astype(int))
 
     # Min-Plus Semiring
@@ -129,10 +137,10 @@ def print_results():
     print("\nA^1 (direct edge weights):")
     print(A_weighted)
     A2_minplus = minplus_power(A_weighted, 2)
-    print("\nA^2 (shortest 2-hop path costs):")
+    print("\nA^2 (minimum costs using at most 2 hops):")
     print(A2_minplus)
     A3_minplus = minplus_power(A_weighted, 3)
-    print("\nA^3 (shortest 3-hop path costs):")
+    print("\nA^3 (minimum costs using at most 3 hops):")
     print(A3_minplus)
     print("\nWhen A^n = A^(n-1), all shortest paths found!")
     print("=" * 60)

@@ -13,102 +13,21 @@ def build_adjacency_list():
         adj_list[i].append(j)
         adj_list[j].append(i)
     return adj_list
+def _partition(method, num_partitions):
+    from graphlab.engine import generate, vertex_partition
+    from graphlab.models import Parameters
+    result = vertex_partition(generate(), Parameters(partitions=num_partitions), method)
+    assignments = dict(enumerate(result['assignments']))
+    sizes = dict(enumerate(result['loads']))
+    print(method, result['status'], result['details'])
+    return assignments, sizes
+
 def fennel(num_partitions=2):
-    adj_list = build_adjacency_list()
-    
-    # Calculate alpha parameter
-    # alpha = sqrt(k) * |E| / |V|^1.5
-    num_edges = len(EDGES)
-    alpha = (math.sqrt(num_partitions) * num_edges) / (NUM_VERTICES ** 1.5)
-    
-    print(f"\nFENNEL Parameters:")
-    print(f"   Partitions (k): {num_partitions}")
-    print(f"   Alpha: {alpha:.4f}")
-    
-    # Initialize all vertices as unassigned (-1)
-    assignments = {i: -1 for i in range(NUM_VERTICES)}
-    partition_sizes = {i: 0 for i in range(num_partitions)}
-    
-    # Process vertices one by one (streaming)
-    for vertex in range(NUM_VERTICES):
-        best_partition = 0
-        best_score = float('-inf')
-        
-        for p in range(num_partitions):
-            # Term 1: neighbors already in partition p
-            neighbors_in_p = sum(
-                1 for neighbor in adj_list[vertex]
-                if assignments[neighbor] == p
-            )
-            
-            # Term 2: balance penalty
-            penalty = alpha * partition_sizes[p]
-            
-            # Final score
-            score = neighbors_in_p - penalty
-            
-            if score > best_score:
-                best_score = score
-                best_partition = p
-        
-        # Assign vertex to best partition
-        assignments[vertex] = best_partition
-        partition_sizes[best_partition] += 1
-        
-        print(f"   Vertex {vertex} → Partition {best_partition} "
-              f"(score: {best_score:.4f})")
-    
-    return assignments, partition_sizes
+    return _partition('FENNEL', num_partitions)
+
 def label_propagation(num_partitions=2):
-    adj_list = build_adjacency_list()
-    
-    # Initialize with random labels (0 or 1)
-    import random
-    random.seed(42)  # fixed seed for reproducibility
-    assignments = {i: random.randint(0, num_partitions-1) 
-                  for i in range(NUM_VERTICES)}
-    
-    print(f"\nLabel Propagation:")
-    print(f"   Initial labels: {assignments}")
-    
-    max_iterations = 100
-    for iteration in range(max_iterations):
-        changed = False
-        new_assignments = assignments.copy()
-        
-        for vertex in range(NUM_VERTICES):
-            # Count neighbor labels
-            label_counts = {p: 0 for p in range(num_partitions)}
-            for neighbor in adj_list[vertex]:
-                label_counts[assignments[neighbor]] += 1
-            
-            # Adopt majority label
-            majority_label = max(label_counts, key=label_counts.get)
-            
-            # Check for tie - keep current label
-            max_count = max(label_counts.values())
-            tied_labels = [l for l, c in label_counts.items() 
-                          if c == max_count]
-            if len(tied_labels) > 1:
-                majority_label = assignments[vertex]
-            
-            if majority_label != assignments[vertex]:
-                new_assignments[vertex] = majority_label
-                changed = True
-        
-        assignments = new_assignments
-        print(f"   Iteration {iteration + 1}: {assignments}")
-        
-        # Terminate if nothing changed
-        if not changed:
-            print(f"   Converged after {iteration + 1} iterations!")
-            break
-    
-    # Calculate partition sizes
-    partition_sizes = {p: sum(1 for v in assignments.values() if v == p)
-                      for p in range(num_partitions)}
-    
-    return assignments, partition_sizes
+    return _partition('Label propagation', num_partitions)
+
 def evaluate_partition(assignments, num_partitions=2):
     adj_list = build_adjacency_list()
     

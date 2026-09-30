@@ -55,44 +55,20 @@ def build_edge_list():
     edge_list = [(i, j) for (i, j, weight) in EDGES]
     return edge_list
 def print_all_structures():
-    print("=" * 60)
-    print("MODULE 1 - GRAPH STORAGE STRUCTURES")
-    print("=" * 60)
+    print('=' * 60)
+    print('MODULE 1 - STORAGE')
+    print('Legacy builders below expose an unweighted topology projection.')
+    print('Matrix:', build_adjacency_matrix(), sep=chr(10))
+    print('Adjacency list:', build_adjacency_list())
+    print('CSR offsets and columns:', build_csr())
+    print('Edge pairs:', build_edge_list())
+    from graphlab.engine import generate, storage
+    report = storage(generate())
+    print('Weighted storage comparison (actual numeric buffer bytes):')
+    for row in report['rows']:
+        print(row['name'], row['payload_bytes'], 'bytes; allocation estimate', row['allocated_bytes_estimate'])
+    print(report['method'])
 
-    # Adjacency Matrix
-    matrix = build_adjacency_matrix()
-    print("\n1. ADJACENCY MATRIX:")
-    print(f"   Size: {NUM_VERTICES} x {NUM_VERTICES} = {NUM_VERTICES * NUM_VERTICES} cells")
-    print(matrix)
-
-    # Adjacency List
-    adj_list = build_adjacency_list()
-    print("\n2. ADJACENCY LIST:")
-    print(f"   Size: {NUM_VERTICES} vertices + {len(EDGES)} edges = {NUM_VERTICES + len(EDGES)} cells")
-    for vertex, neighbors in adj_list.items():
-        print(f"   {vertex} -> {neighbors}")
-
-    # CSR
-    row, col = build_csr()
-    print("\n3. CSR:")
-    print(f"   Size: {len(row)} + {len(col)} = {len(row) + len(col)} cells")
-    print(f"   Row array: {row}")
-    print(f"   Col array: {col}")
-
-    # Edge List
-    edge_list = build_edge_list()
-    print("\n4. EDGE LIST:")
-    print(f"   Size: {len(edge_list)} cells")
-    print(f"   {edge_list}")
-
-    # Memory comparison
-    print("\n" + "=" * 60)
-    print("MEMORY COMPARISON:")
-    print(f"   Adjacency Matrix : {NUM_VERTICES * NUM_VERTICES} cells")
-    print(f"   Adjacency List   : {NUM_VERTICES + len(EDGES)} cells")
-    print(f"   CSR              : {len(row) + len(col)} cells")
-    print(f"   Edge List        : {len(edge_list)} cells")
-    print("=" * 60)
 def visualize_graph():
     # Create networkx graph
     G = nx.Graph()
@@ -144,13 +120,8 @@ def visualize_graph():
 def visualize_memory_comparison():
     # Data for comparison
     structures = ['Adjacency\nMatrix', 'Adjacency\nList', 'CSR', 'Edge List']
-    row, col = build_csr()
-    sizes = [
-        NUM_VERTICES * NUM_VERTICES,
-        NUM_VERTICES + len(EDGES),
-        len(row) + len(col),
-        len(EDGES)
-    ]
+    from graphlab.engine import generate, storage
+    sizes = [row['payload_bytes'] for row in storage(generate())['rows']]
     colors = ['red', 'orange', 'green', 'blue']
 
     # Create bar chart
@@ -164,17 +135,17 @@ def visualize_memory_comparison():
     for bar, size in zip(bars, sizes):
         plt.text(bar.get_x() + bar.get_width() / 2,
                  bar.get_height() + 0.5,
-                 str(size) + ' cells',
+                 str(size) + ' bytes',
                  ha='center', va='bottom',
                  fontweight='bold', fontsize=11)
 
-    plt.ylabel("Number of cells stored", fontsize=12)
+    plt.ylabel("Weighted numeric payload (bytes)", fontsize=12)
     plt.xlabel("Storage Structure", fontsize=12)
     plt.ylim(0, max(sizes) * 1.2)
 
     # Add explanation text
     plt.figtext(0.5, 0.01,
-                "Lower is better — Adjacency Matrix wastes space on non-existent edges",
+                "int64 indices / float64 weights; headers and label strings excluded",
                 ha='center', fontsize=10, style='italic')
 
     plt.tight_layout()

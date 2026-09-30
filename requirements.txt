@@ -1,3 +1,6 @@
-matplotlib
-numpy
-networkx
+fastapi==0.142.2
+uvicorn==0.54.0
+python-multipart==0.0.32
+numpy==2.5.3
+networkx==3.7
+matplotlib==3.11.2
