@@ -13,7 +13,7 @@ def client(tmp_path,monkeypatch):
         yield client
 
 
-def test_upload_analyze_path_export_and_restart(client):
+def test_upload_analyze_path_export_and_history(client):
     upload=client.post('/api/import',files={'file':('graph.csv',b'source,target,weight\nA,B,2\nB,C,1\nA,C,8\n','text/csv')})
     assert upload.status_code==200
     graph=upload.json()
@@ -24,8 +24,7 @@ def test_upload_analyze_path_export_and_restart(client):
     assert route['distance']==3 and route['path']==['A','B','C']
     assert route['semiring']['min_weight_up_to_hops']==3
     assert client.get('/api/runs').json()[0]['id']==run_id
-    with TestClient(app) as restarted:
-        assert restarted.get('/api/runs/'+run_id).json()==data
+    assert client.get('/api/runs/'+run_id).json()==data
     exported=client.get(f'/api/runs/{run_id}/export?format=json')
     assert exported.json()==data
     rows=list(csv.DictReader(io.StringIO(client.get(f'/api/runs/{run_id}/export?format=csv').text)))

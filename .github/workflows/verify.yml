@@ -2,6 +2,9 @@ name: Verify graph calculations and browser workflows
 on:
   push:
   pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -11,6 +14,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -22,7 +26,8 @@ jobs:
       - name: Install Chromium
         run: python -m playwright install --with-deps chromium
       - name: Test algorithms and API
-        run: python -m pytest -q -m "not browser"
+        timeout-minutes: 5
+        run: python -m pytest -v -m "not browser" -o faulthandler_timeout=30
       - name: Test real browser workflows
         run: python -m pytest -q -m browser
       - name: Run the original coursework pipeline

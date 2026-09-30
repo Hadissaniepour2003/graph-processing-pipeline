@@ -10,6 +10,7 @@ import sqlite3
 from urllib.parse import urlparse
 import uuid
 from fastapi import FastAPI, File, UploadFile, Request
+from starlette.datastructures import Headers, URL
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -52,23 +53,46 @@ def get_run(run_id):
     return json.loads(row[0])
 
 
-@app.middleware('http')
-async def local_boundary(request: Request, call_next):
-    if request.method not in ('GET', 'HEAD', 'OPTIONS'):
-        origin = request.headers.get('origin')
+class LocalBoundary:
+    """Pure ASGI boundary: no request-body replay through BaseHTTPMiddleware."""
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope['type'] != 'http' or scope['method'] in ('GET', 'HEAD', 'OPTIONS'):
+            return await self.app(scope, receive, send)
+        origin = Headers(scope=scope).get('origin')
         if origin:
-            parsed = urlparse(origin)
-            if parsed.scheme != 'http' or parsed.hostname not in ('localhost', '127.0.0.1') or parsed.port != request.url.port:
-                return JSONResponse({'detail': 'Open this application from its local address.'}, status_code=403)
-        chunks = []
-        total = 0
-        async for chunk in request.stream():
+            try:
+                parsed = urlparse(origin)
+                valid = parsed.scheme == 'http' and parsed.hostname in ('localhost', '127.0.0.1') and parsed.port == URL(scope=scope).port
+            except ValueError:
+                valid = False
+            if not valid:
+                return await JSONResponse({'detail': 'Open this application from its local address.'}, status_code=403)(scope, receive, send)
+        chunks, total = [], 0
+        while True:
+            message = await receive()
+            if message['type'] == 'http.disconnect':
+                return
+            chunk = message.get('body', b'')
             total += len(chunk)
             if total > 2_000_000:
-                return JSONResponse({'detail': 'Request is too large. Maximum body size: 2 MB.'}, status_code=413)
+                return await JSONResponse({'detail': 'Request is too large. Maximum body size: 2 MB.'}, status_code=413)(scope, receive, send)
             chunks.append(chunk)
-        request._body = b''.join(chunks)
-    return await call_next(request)
+            if not message.get('more_body', False):
+                break
+        body = b''.join(chunks)
+        delivered = False
+        async def bounded_receive():
+            nonlocal delivered
+            if not delivered:
+                delivered = True
+                return {'type': 'http.request', 'body': body, 'more_body': False}
+            return await receive()
+        return await self.app(scope, bounded_receive, send)
+
+app.add_middleware(LocalBoundary)
 
 
 @app.exception_handler(ValueError)
