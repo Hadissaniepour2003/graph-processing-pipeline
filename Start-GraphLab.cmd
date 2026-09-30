@@ -22,7 +22,7 @@ if not exist .venv\Scripts\python.exe (
 echo Checking project dependencies. The first launch needs internet access...
 .venv\Scripts\python.exe -m pip install -r requirements.txt --disable-pip-version-check
 if errorlevel 1 goto failed
-.venv\Scripts\python.exe run_lab.py
+.venv\Scripts\python.exe run_lab.py %*
 if errorlevel 1 goto failed
 exit /b 0
 :failed
