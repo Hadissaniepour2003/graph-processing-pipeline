@@ -117,7 +117,7 @@ def test_weighted_storage_accounting():
     b'source,target,weight\nA,B,inf\n', b'source,target,weight\nA,A,1\n',
     b'source,target,weight\nA,B,1\nB,A,2\n', b'source,target\nA,B\n',
     b'source,target,weight\nA,B\n', b'source,target,weight\nA,B,1,2\n',
-    b'source,target,weight\n', b'\xff\xff', b'x'*1_000_001])
+    b'source,target,weight\n', b'\xff\xff', b'x'*1_000_001], ids=['negative-weight','nan','infinity','self-loop','duplicate-edge','wrong-header','missing-column','extra-column','no-edges','invalid-utf8','oversized-file'])
 def test_csv_rejects_invalid_inputs(data):
     with pytest.raises(ValueError):parse_csv(data)
 

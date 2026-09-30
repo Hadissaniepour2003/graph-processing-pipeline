@@ -27,9 +27,9 @@ jobs:
         run: python -m playwright install --with-deps chromium
       - name: Test algorithms and API
         timeout-minutes: 5
-        run: python -m pytest -v -m "not browser" -o faulthandler_timeout=30
+        run: python scripts/verify_ci.py unit
       - name: Test real browser workflows
-        run: python -m pytest -q -m browser
+        run: python scripts/verify_ci.py browser
       - name: Run the original coursework pipeline
         env:
           MPLBACKEND: Agg
